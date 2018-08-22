@@ -129,6 +129,30 @@ static const spi_conf_t spi_config[] = {
 /** @} */
 
 /**
+* @name     I2C configuration
+* @{
+*/
+static const i2c_conf_t i2c_config[] = {
+    {
+        .dev   = TWI0,
+        .id    = ID_TWI0,
+        .scl   = GPIO_PIN(PA, 18),
+        .sda   = GPIO_PIN(PA, 17),
+        .mux   = GPIO_MUX_A
+    },
+    {
+        .dev   = TWI1,
+        .id    = ID_TWI1,
+        .scl   = GPIO_PIN(PB, 13),
+        .sda   = GPIO_PIN(PB, 12),
+        .mux   = GPIO_MUX_A
+    }
+};
+
+#define I2C_NUMOF           (sizeof(i2c_config) / sizeof(i2c_config[0]))
+/** @} */
+
+/**
  * @name    PWM configuration
  * @{
  */

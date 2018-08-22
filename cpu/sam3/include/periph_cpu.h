@@ -232,6 +232,17 @@ typedef struct {
 } spi_conf_t;
 
 /**
+ * @brief   I2C configuration data
+ */
+typedef struct {
+    Twi *dev;               /**< TWI module to use */
+    uint8_t id;             /**< corresponding ID of that module */
+    gpio_t scl;             /**< pin mapped to the SCL line */
+    gpio_t sda;             /**< pin mapped to the SDA line */
+    gpio_mux_t mux;         /**< pin MUX setting */
+} i2c_conf_t;
+
+/**
  * @brief   Configure the given GPIO pin to be used with the given MUX setting
  *
  * @param[in] pin           GPIO pin to configure
