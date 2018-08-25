@@ -28,84 +28,113 @@
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 
+/**
+ * @brief   Array holding one pre-initialized mutex for each I2C device
+ * TODO pre-initialized ???
+ */
+static mutex_t locks[I2C_NUMOF];
 
-void i2c_init(i2c_t dev)
+static inline Twi *dev(i2c_t bus)
 {
-    (void) dev;
+    return i2c_config[bus].dev;
 }
 
-int i2c_acquire(i2c_t dev)
+static void _i2c_init_pins(i2c_t bus)
 {
-    (void) dev;
-    return -1;
+    gpio_init(i2c_config[bus].scl, GPIO_OUT);
+    gpio_init(i2c_config[bus].sda, GPIO_OUT);
+    gpio_init_mux(i2c_config[bus].scl, i2c_config[bus].mux);
+    gpio_init_mux(i2c_config[bus].sda, i2c_config[bus].mux);
 }
 
-int i2c_release(i2c_t dev)
+void i2c_init(i2c_t bus)
 {
-    (void) dev;
-    return -1;
+    assert(bus < I2C_NUMOF);
+
+    /* initialize device lock */
+    mutex_init(&locks[bus]);
+    /* initialize pins */
+    _i2c_init_pins(bus);
 }
 
-int i2c_read_reg(i2c_t dev, uint16_t addr, uint16_t reg,
+int i2c_acquire(i2c_t bus)
+{
+    /* lock bus */
+    mutex_lock(&locks[bus]);
+
+    /* TODO enable I2C bus? */
+
+    return 0;
+}
+
+int i2c_release(i2c_t bus)
+{
+    /* release device lock */
+    mutex_unlock(&locks[bus]);
+
+    return 0;
+}
+
+int i2c_read_reg(i2c_t bus, uint16_t addr, uint16_t reg,
                  void *data, uint8_t flags)
 {
-    (void) dev;
+    (void) bus;
     (void) addr; (void) reg; (void) data; (void) flags;
     return -1;
 }
 
 
-int i2c_read_regs(i2c_t dev, uint16_t addr, uint16_t reg,
+int i2c_read_regs(i2c_t bus, uint16_t addr, uint16_t reg,
                   void *data, size_t len, uint8_t flags)
 {
-    (void) dev;
+    (void) bus;
     (void) addr; (void) reg; (void) data; (void) len; (void) flags;
     return -1;
 }
 
-int i2c_read_byte(i2c_t dev, uint16_t addr, void *data, uint8_t flags)
+int i2c_read_byte(i2c_t bus, uint16_t addr, void *data, uint8_t flags)
 {
-    (void) dev;
+    (void) bus;
     (void) addr; (void) data; (void) flags;
     return -1;
 }
 
-int i2c_read_bytes(i2c_t dev, uint16_t addr,
+int i2c_read_bytes(i2c_t bus, uint16_t addr,
                    void *data, size_t len, uint8_t flags)
 {
-    (void) dev;
+    (void) bus;
     (void) addr; (void) data; (void) len; (void) flags;
     return -1;
 }
 
 
-int i2c_write_byte(i2c_t dev, uint16_t addr, uint8_t data, uint8_t flags)
+int i2c_write_byte(i2c_t bus, uint16_t addr, uint8_t data, uint8_t flags)
 {
-    (void) dev;
+    (void) bus;
     (void) addr; (void) data; (void) flags;
     return -1;
 }
 
-int i2c_write_bytes(i2c_t dev, uint16_t addr, const void *data,
+int i2c_write_bytes(i2c_t bus, uint16_t addr, const void *data,
                     size_t len, uint8_t flags)
 {
-    (void) dev;
+    (void) bus;
     (void) addr; (void) data; (void) len; (void) flags;
     return -1;
 }
 
-int i2c_write_reg(i2c_t dev, uint16_t addr, uint16_t reg,
+int i2c_write_reg(i2c_t bus, uint16_t addr, uint16_t reg,
                   uint8_t data, uint8_t flags)
 {
-    (void) dev;
+    (void) bus;
     (void) addr; (void) reg; (void) data; (void) flags;
     return -1;
 }
 
-int i2c_write_regs(i2c_t dev, uint16_t addr, uint16_t reg,
+int i2c_write_regs(i2c_t bus, uint16_t addr, uint16_t reg,
                   const void *data, size_t len, uint8_t flags)
 {
-    (void) dev;
+    (void) bus;
     (void) addr; (void) reg; (void) data; (void) len; (void) flags;
     return -1;
 }
