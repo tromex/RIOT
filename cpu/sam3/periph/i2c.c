@@ -39,7 +39,6 @@
 
 /**
  * @brief   Array holding one pre-initialized mutex for each I2C device
- * TODO pre-initialized ???
  */
 static mutex_t locks[I2C_NUMOF];
 
