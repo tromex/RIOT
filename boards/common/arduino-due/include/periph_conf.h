@@ -136,6 +136,7 @@ static const i2c_conf_t i2c_config[] = {
     {
         .dev   = TWI0,
         .id    = ID_TWI0,
+        .speed = I2C_SPEED_FAST,
         .scl   = GPIO_PIN(PA, 18),
         .sda   = GPIO_PIN(PA, 17),
         .mux   = GPIO_MUX_A
@@ -143,6 +144,7 @@ static const i2c_conf_t i2c_config[] = {
     {
         .dev   = TWI1,
         .id    = ID_TWI1,
+        .speed = I2C_SPEED_FAST,
         .scl   = GPIO_PIN(PB, 13),
         .sda   = GPIO_PIN(PB, 12),
         .mux   = GPIO_MUX_A
