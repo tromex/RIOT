@@ -56,6 +56,14 @@ typedef uint32_t gpio_t;
 /** @} */
 
 /**
+ * @brief Declare needed generic I2C functions
+ * @{
+ */
+#define PERIPH_I2C_NEED_READ_REG
+#define PERIPH_I2C_NEED_WRITE_REG
+/** @} */
+
+/**
  * @brief   Length of the CPU_ID in octets
  */
 #define CPUID_LEN           (16U)

@@ -42,9 +42,9 @@
  */
 static mutex_t locks[I2C_NUMOF];
 
-static inline Twi *dev(i2c_t bus)
+static inline Twi *twi(i2c_t dev)
 {
-    return i2c_config[bus].dev;
+    return i2c_config[dev].dev;
 }
 
 static inline void twi_reset(Twi *p_twi)
@@ -64,18 +64,14 @@ static inline void twi_enable_master_mode(Twi *p_twi)
     p_twi->TWI_CR = TWI_CR_MSEN;
 }
 
-/*
- * return true when set_speed ok
- */
-static bool i2c_set_speed(i2c_t bus, uint32_t ul_speed)
+static void i2c_set_speed(i2c_t dev, uint32_t ul_speed)
 {
     uint32_t ckdiv = 0;
     uint32_t c_lh_div;
     uint32_t cldiv, chdiv;
 
-    if (ul_speed > I2C_SPEED_FAST) {
-        return false;
-    }
+    if (ul_speed > I2C_SPEED_FAST)
+        return;
 
     /* Low level time not less than 1.3us of I2C Fast Mode. */
     if (ul_speed > LOW_LEVEL_TIME_LIMIT) {
@@ -100,7 +96,7 @@ static bool i2c_set_speed(i2c_t bus, uint32_t ul_speed)
         }
 
         /* set clock waveform generator register */
-        dev(bus)->TWI_CWGR =
+        twi(dev)->TWI_CWGR =
             TWI_CWGR_CLDIV(cldiv) | TWI_CWGR_CHDIV(chdiv) |
             TWI_CWGR_CKDIV(ckdiv);
     } else {
@@ -115,133 +111,96 @@ static bool i2c_set_speed(i2c_t bus, uint32_t ul_speed)
         }
 
         /* set clock waveform generator register */
-        dev(bus)->TWI_CWGR =
+        twi(dev)->TWI_CWGR =
             TWI_CWGR_CLDIV(c_lh_div) | TWI_CWGR_CHDIV(c_lh_div) |
             TWI_CWGR_CKDIV(ckdiv);
     }
-
-    return true;
 }
 
-static inline int twi_master_init(i2c_t bus)
+static inline void twi_master_init(i2c_t dev)
 {
     /* Disable TWI interrupts */
-    dev(bus)->TWI_IDR = ~0UL;
+    twi(dev)->TWI_IDR = ~0UL;
 
     /* Dummy read in status register */
-    dev(bus)->TWI_SR;
+    twi(dev)->TWI_SR;
 
     /* Reset TWI peripheral */
-    twi_reset(dev(bus));
+    twi_reset(twi(dev));
 
-    twi_enable_master_mode(dev(bus));
-
-    /* Select the speed */
-    if (i2c_set_speed(bus, i2c_config[bus].speed))
-        return 0;
-    return -1;
+    /* Master mode and bus speed */
+    twi_enable_master_mode(twi(dev));
+    i2c_set_speed(dev, i2c_config[dev].speed);
 }
 
-void i2c_init(i2c_t bus)
+void i2c_init(i2c_t dev)
 {
-    assert(bus < I2C_NUMOF);
+    assert(dev < I2C_NUMOF);
 
     /* initialize device lock */
-    mutex_init(&locks[bus]);
+    mutex_init(&locks[dev]);
 
     /* program PIO controller */
-    gpio_init_mux(i2c_config[bus].scl, i2c_config[bus].mux);
-    gpio_init_mux(i2c_config[bus].sda, i2c_config[bus].mux);
+    gpio_init_mux(i2c_config[dev].scl, i2c_config[dev].mux);
+    gpio_init_mux(i2c_config[dev].sda, i2c_config[dev].mux);
 
     /* initialize TWI master mode */
-    twi_master_init(bus);
+    twi_master_init(dev);
 
     /* disable the peripheral clock */
-    PMC->PMC_PCER0 &= ~(1 << i2c_config[bus].id);
+    PMC->PMC_PCER0 &= ~(1 << i2c_config[dev].id);
 }
 
-int i2c_acquire(i2c_t bus)
+int i2c_acquire(i2c_t dev)
 {
     /* lock bus */
-    mutex_lock(&locks[bus]);
+    mutex_lock(&locks[dev]);
 
     /* enable the peripheral clock */
-    PMC->PMC_PCER0 |= (1 << i2c_config[bus].id);
+    PMC->PMC_PCER0 |= (1 << i2c_config[dev].id);
 
     return 0;
 }
 
-int i2c_release(i2c_t bus)
+int i2c_release(i2c_t dev)
 {
     /* disable the peripheral clock */
-    PMC->PMC_PCER0 &= ~(1 << i2c_config[bus].id);
+    PMC->PMC_PCER0 &= ~(1 << i2c_config[dev].id);
 
     /* release device lock */
-    mutex_unlock(&locks[bus]);
+    mutex_unlock(&locks[dev]);
 
     return 0;
 }
 
-int i2c_read_reg(i2c_t bus, uint16_t addr, uint16_t reg,
-        void *data, uint8_t flags)
-{
-    (void) bus;
-    (void) addr; (void) reg; (void) data; (void) flags;
-    return -1;
-}
-
-
-int i2c_read_regs(i2c_t bus, uint16_t addr, uint16_t reg,
+int i2c_read_regs(i2c_t dev, uint16_t addr, uint16_t reg,
         void *data, size_t len, uint8_t flags)
 {
-    (void) bus;
+    (void) dev;
     (void) addr; (void) reg; (void) data; (void) len; (void) flags;
     return -1;
 }
 
-int i2c_read_byte(i2c_t bus, uint16_t addr, void *data, uint8_t flags)
-{
-    (void) bus;
-    (void) addr; (void) data; (void) flags;
-    return -1;
-}
-
-int i2c_read_bytes(i2c_t bus, uint16_t addr,
+int i2c_read_bytes(i2c_t dev, uint16_t addr,
         void *data, size_t len, uint8_t flags)
 {
-    (void) bus;
+    (void) dev;
     (void) addr; (void) data; (void) len; (void) flags;
     return -1;
 }
 
-
-int i2c_write_byte(i2c_t bus, uint16_t addr, uint8_t data, uint8_t flags)
-{
-    (void) bus;
-    (void) addr; (void) data; (void) flags;
-    return -1;
-}
-
-int i2c_write_bytes(i2c_t bus, uint16_t addr, const void *data,
+int i2c_write_bytes(i2c_t dev, uint16_t addr, const void *data,
         size_t len, uint8_t flags)
 {
-    (void) bus;
+    (void) dev;
     (void) addr; (void) data; (void) len; (void) flags;
     return -1;
 }
 
-int i2c_write_reg(i2c_t bus, uint16_t addr, uint16_t reg,
-        uint8_t data, uint8_t flags)
-{
-    (void) bus;
-    (void) addr; (void) reg; (void) data; (void) flags;
-    return -1;
-}
-
-int i2c_write_regs(i2c_t bus, uint16_t addr, uint16_t reg,
+int i2c_write_regs(i2c_t dev, uint16_t addr, uint16_t reg,
         const void *data, size_t len, uint8_t flags)
 {
-    (void) bus;
+    (void) dev;
     (void) addr; (void) reg; (void) data; (void) len; (void) flags;
     return -1;
 }
