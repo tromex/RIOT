@@ -33,15 +33,8 @@
 #include "debug.h"
 
 
-/* Low level time limit of I2C Fast Mode. */
-#define LOW_LEVEL_TIME_LIMIT 384000
-#define TWI_CLK_DIVIDER      2
-#define TWI_CLK_CALC_ARGU    4
-#define TWI_CLK_DIV_MAX      0xFF
-#define TWI_CLK_DIV_MIN      7
-
 /** Time-out value (number of attempts). */
-#define TWI_TIMEOUT 15000
+#define TWI_TIMEOUT 1500000
 
 /**
  * @brief   Array holding one pre-initialized mutex for each I2C device
@@ -55,19 +48,17 @@ static inline Twi *twi(i2c_t dev)
 
 static inline void twi_reset(Twi *p_twi)
 {
+    uint32_t i;
+
     /* Set SWRST bit to reset TWI peripheral */
     p_twi->TWI_CR = TWI_CR_SWRST;
     p_twi->TWI_RHR;
-}
 
-static inline void twi_enable_master_mode(Twi *p_twi)
-{
-    /* Set Master Disable bit and Slave Disable bit */
-    p_twi->TWI_CR = TWI_CR_MSDIS;
-    p_twi->TWI_CR = TWI_CR_SVDIS;
+    /* Wait 10 ms */
+    for (i=0; i<1000000; i++);
 
-    /* Set Master Enable bit */
-    p_twi->TWI_CR = TWI_CR_MSEN;
+    /* TWI Slave Mode Disabled, TWI Master Mode Disabled */
+    p_twi->TWI_CR = TWI_CR_MSDIS | TWI_CR_SVDIS;
 }
 
 /**
@@ -94,57 +85,40 @@ static uint32_t twi_mk_addr(const uint16_t reg, int len)
     return val;
 }
 
-static void i2c_set_speed(i2c_t dev, uint32_t ul_speed)
+static inline uint32_t i2c_compute_speed(i2c_speed_t speed)
 {
-    uint32_t ckdiv = 0;
-    uint32_t c_lh_div;
-    uint32_t cldiv, chdiv;
-
-    if (ul_speed > I2C_SPEED_FAST)
-        return;
-
-    /* Low level time not less than 1.3us of I2C Fast Mode. */
-    if (ul_speed > LOW_LEVEL_TIME_LIMIT) {
-        /* Low level of time fixed for 1.3us. */
-        cldiv = CLOCK_CORECLOCK / (LOW_LEVEL_TIME_LIMIT * TWI_CLK_DIVIDER) - TWI_CLK_CALC_ARGU;
-        chdiv = CLOCK_CORECLOCK / ((ul_speed + (ul_speed - LOW_LEVEL_TIME_LIMIT)) * TWI_CLK_DIVIDER) - TWI_CLK_CALC_ARGU;
-
-        /* cldiv must fit in 8 bits, ckdiv must fit in 3 bits */
-        while ((cldiv > TWI_CLK_DIV_MAX) && (ckdiv < TWI_CLK_DIV_MIN)) {
-            /* Increase clock divider */
-            ckdiv++;
-            /* Divide cldiv value */
-            cldiv /= TWI_CLK_DIVIDER;
-        }
-
-        /* chdiv must fit in 8 bits, ckdiv must fit in 3 bits */
-        while ((chdiv > TWI_CLK_DIV_MAX) && (ckdiv < TWI_CLK_DIV_MIN)) {
-            /* Increase clock divider */
-            ckdiv++;
-            /* Divide cldiv value */
-            chdiv /= TWI_CLK_DIVIDER;
-        }
-
-        /* set clock waveform generator register */
-        twi(dev)->TWI_CWGR =
-            TWI_CWGR_CLDIV(cldiv) | TWI_CWGR_CHDIV(chdiv) |
-            TWI_CWGR_CKDIV(ckdiv);
-    } else {
-        c_lh_div = CLOCK_CORECLOCK / (ul_speed * TWI_CLK_DIVIDER) - TWI_CLK_CALC_ARGU;
-
-        /* cldiv must fit in 8 bits, ckdiv must fit in 3 bits */
-        while ((c_lh_div > TWI_CLK_DIV_MAX) && (ckdiv < TWI_CLK_DIV_MIN)) {
-            /* Increase clock divider */
-            ckdiv++;
-            /* Divide cldiv value */
-            c_lh_div /= TWI_CLK_DIVIDER;
-        }
-
-        /* set clock waveform generator register */
-        twi(dev)->TWI_CWGR =
-            TWI_CWGR_CLDIV(c_lh_div) | TWI_CWGR_CHDIV(c_lh_div) |
-            TWI_CWGR_CKDIV(ckdiv);
+    switch (speed) {
+    case I2C_SPEED_LOW:
+        return 10000;
+    case I2C_SPEED_NORMAL:
+        return 100000;
+    case I2C_SPEED_FAST:
+        return 400000;
+    case I2C_SPEED_FAST_PLUS:
+        return 1000000;
+    case I2C_SPEED_HIGH:
+        return 3400000;
+    default:
+        return 100000;
     }
+}
+
+static void i2c_set_clock(i2c_t dev, uint32_t ul_speed)
+{
+    uint32_t clock = CLOCK_CORECLOCK;
+    uint32_t ckDiv = 0;
+    uint32_t clDiv = 0;
+
+    while (1) {
+        clDiv = ((clock / (2 * ul_speed)) - 4) / (1 << ckDiv);
+        if (clDiv <= 255)
+            break;
+	else
+	    ckDiv++;
+    }
+
+    twi(dev)->TWI_CWGR = 0;
+    twi(dev)->TWI_CWGR = (ckDiv << 16) | (clDiv << 8) | clDiv;
 }
 
 static inline void twi_master_init(i2c_t dev)
@@ -152,15 +126,19 @@ static inline void twi_master_init(i2c_t dev)
     /* Disable TWI interrupts */
     twi(dev)->TWI_IDR = ~0UL;
 
-    /* Dummy read in status register */
-    twi(dev)->TWI_SR;
+    /* Disable PDC Channel */
+    twi(dev)->TWI_PTCR = UART_PTCR_RXTDIS | UART_PTCR_TXTDIS;
+
+    /* SVEN: TWI Slave Mode Enabled */
+    twi(dev)->TWI_CR = TWI_CR_SVEN;
 
     /* Reset TWI peripheral */
     twi_reset(twi(dev));
 
-    /* Master mode and bus speed */
-    twi_enable_master_mode(twi(dev));
-    i2c_set_speed(dev, i2c_config[dev].speed);
+    /* Master mode */
+    twi(dev)->TWI_CR = TWI_CR_MSEN;
+
+    i2c_set_clock(dev, 100000);
 }
 
 void i2c_init(i2c_t dev)
@@ -171,6 +149,8 @@ void i2c_init(i2c_t dev)
     mutex_init(&locks[dev]);
 
     /* program PIO controller */
+    gpio_init(i2c_config[dev].scl, GPIO_OD_PU);
+    gpio_init(i2c_config[dev].sda, GPIO_OD_PU);
     gpio_init_mux(i2c_config[dev].scl, i2c_config[dev].mux);
     gpio_init_mux(i2c_config[dev].sda, i2c_config[dev].mux);
 
@@ -178,7 +158,8 @@ void i2c_init(i2c_t dev)
     twi_master_init(dev);
 
     /* disable the peripheral clock */
-    PMC->PMC_PCER0 &= ~(1 << i2c_config[dev].id);
+    if ((PMC->PMC_PCSR0 & (1u << i2c_config[dev].id)) == (1u << i2c_config[dev].id))
+        PMC->PMC_PCDR0 = 1 << i2c_config[dev].id;
 }
 
 int i2c_acquire(i2c_t dev)
@@ -187,7 +168,8 @@ int i2c_acquire(i2c_t dev)
     mutex_lock(&locks[dev]);
 
     /* enable the peripheral clock */
-    PMC->PMC_PCER0 |= (1 << i2c_config[dev].id);
+    if ((PMC->PMC_PCSR0 & (1u << i2c_config[dev].id)) != (1u << i2c_config[dev].id))
+        PMC->PMC_PCER0 = 1 << i2c_config[dev].id;
 
     return 0;
 }
@@ -195,7 +177,8 @@ int i2c_acquire(i2c_t dev)
 int i2c_release(i2c_t dev)
 {
     /* disable the peripheral clock */
-    PMC->PMC_PCER0 &= ~(1 << i2c_config[dev].id);
+    if ((PMC->PMC_PCSR0 & (1u << i2c_config[dev].id)) == (1u << i2c_config[dev].id))
+        PMC->PMC_PCDR0 = 1 << i2c_config[dev].id;
 
     /* release device lock */
     mutex_unlock(&locks[dev]);
@@ -207,7 +190,7 @@ int i2c_read_regs(i2c_t dev, uint16_t addr, uint16_t reg,
         void *data, size_t len, uint8_t flags)
 {
     uint32_t status;
-    uint8_t reg_len = (flags | I2C_REG16) ? 2 : 1;
+    uint8_t reg_len = (flags & I2C_REG16) ? 2 : 1;
     uint32_t cnt = len;
     uint8_t *buffer = data;
     uint8_t stop_sent = 0;
@@ -220,8 +203,7 @@ int i2c_read_regs(i2c_t dev, uint16_t addr, uint16_t reg,
     /* Set read mode, slave address and 3 internal address byte lengths */
     twi(dev)->TWI_MMR = 0;
     twi(dev)->TWI_MMR = TWI_MMR_MREAD | TWI_MMR_DADR(addr) |
-        ((reg_len << TWI_MMR_IADRSZ_Pos) &
-         TWI_MMR_IADRSZ_Msk);
+        ((reg_len << TWI_MMR_IADRSZ_Pos) & TWI_MMR_IADRSZ_Msk);
 
     /* Set internal address for remote chip */
     twi(dev)->TWI_IADR = 0;
@@ -358,7 +340,7 @@ int i2c_write_bytes(i2c_t dev, uint16_t addr, const void *data,
             break;
     }
 
-    if (!(flags | I2C_NOSTOP)) {
+    if (!(flags & I2C_NOSTOP)) {
         /* Send stop */
         twi(dev)->TWI_CR = TWI_CR_STOP;
         while (!(twi(dev)->TWI_SR & TWI_SR_TXCOMP));
@@ -371,7 +353,7 @@ int i2c_write_regs(i2c_t dev, uint16_t addr, uint16_t reg,
         const void *data, size_t len, uint8_t flags)
 {
     uint32_t status;
-    uint8_t reg_len = (flags | I2C_REG16) ? 2 : 1;
+    uint8_t reg_len = (flags & I2C_REG16) ? 2 : 1;
     uint32_t cnt = len;
     const uint8_t *buffer = data;
 
