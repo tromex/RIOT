@@ -48,6 +48,14 @@ typedef uint32_t gpio_t;
 /** @} */
 
 /**
+ * @brief Declare needed generic I2C functions
+ * @{
+ */
+#define PERIPH_I2C_NEED_READ_REG
+#define PERIPH_I2C_NEED_WRITE_REG
+/** @} */
+
+/**
  * @brief   Length of the CPU_ID in octets
  */
 #define CPUID_LEN           (16U)
@@ -159,6 +167,32 @@ typedef enum {
     SPI_MODE_3 = (SPI_CSR_CPOL)                     /**< CPOL=1, CPHA=1 */
 } spi_mode_t;
 /** @} */
+
+/**
+ * @brief   Override I2C clock speed values
+ * @{
+ */
+#define HAVE_I2C_SPEED_T
+typedef enum {
+    I2C_SPEED_LOW       = 10000U,     /**< low speed mode:    ~10kbit/s */
+    I2C_SPEED_NORMAL    = 100000U,    /**< normal mode:       ~100kbit/s */
+    I2C_SPEED_FAST      = 400000U,    /**< fast mode:         ~400kbit/s */
+    I2C_SPEED_FAST_PLUS = 1000000U,   /**< fast plus mode:    ~1Mbit/s */
+    I2C_SPEED_HIGH      = 3400000U,   /**< high speed mode:   ~3.4Mbit/s */
+} i2c_speed_t;
+/** @} */
+
+/**
+ * @brief   I2C configuration data
+ */
+typedef struct {
+    Twi *dev;               /**< TWI module to use */
+    uint8_t id;             /**< corresponding ID of that module */
+    i2c_speed_t speed;      /**< baudrate used for the bus */
+    gpio_t scl;             /**< pin mapped to the SCL line */
+    gpio_t sda;             /**< pin mapped to the SDA line */
+    gpio_mux_t mux;         /**< pin MUX setting */
+} i2c_conf_t;
 
 /**
  * @brief   Override default SPI clock values
