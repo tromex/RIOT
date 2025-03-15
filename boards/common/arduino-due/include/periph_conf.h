@@ -153,9 +153,9 @@ static const spi_conf_t spi_config[] = {
  */
 static const pwm_chan_conf_t pwm_chan[] = {
     { .pin = GPIO_PIN(PC, 21), .hwchan = 4 },
-    { .pin = GPIO_PIN(PC, 22), .hwchan = 5 },
-    { .pin = GPIO_PIN(PC, 23), .hwchan = 6 },
-    { .pin = GPIO_PIN(PC, 24), .hwchan = 7 }
+    { .pin = GPIO_PIN(PC, 22), .hwchan = 5 }//,
+//    { .pin = GPIO_PIN(PC, 23), .hwchan = 6 },
+//    { .pin = GPIO_PIN(PC, 24), .hwchan = 7 }
 };
 
 #define PWM_NUMOF           (1U)
